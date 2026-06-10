@@ -394,6 +394,12 @@ class Bullet {
   getRect() {
     return { left: this.x - 2, top: this.y - 2, right: this.x + 2, bottom: this.y + 2 };
   }
+
+  collidesWith(otherRect) {
+    const r = this.getRect();
+    return !(r.right <= otherRect.left || r.left >= otherRect.right ||
+             r.bottom <= otherRect.top || r.top >= otherRect.bottom);
+  }
 }
 
 let allBullets = [];
@@ -475,7 +481,8 @@ function loadMap(levelIndex) {
 }
 
 function spawnPlayer() {
-  player = new Tank(9 * TILE_SIZE + HALF_TANK, 20 * TILE_SIZE, DIR_UP, '#4ade80', true);
+  // 出生在底部中央空地区域（避免与地图固体块重叠）
+  player = new Tank(10 * TILE_SIZE + TILE_SIZE / 2, 18 * TILE_SIZE + TILE_SIZE / 2, DIR_UP, '#4ade80', true);
 }
 
 function spawnEnemies(count) {
@@ -727,7 +734,7 @@ function update() {
           // 重生
           setTimeout(() => {
             if (gameRunning) {
-              player = new Tank(9 * TILE_SIZE + HALF_TANK, 20 * TILE_SIZE, DIR_UP, '#4ade80', true);
+              player = new Tank(10 * TILE_SIZE + TILE_SIZE / 2, 18 * TILE_SIZE + TILE_SIZE / 2, DIR_UP, '#4ade80', true);
               updateUI();
             }
           }, 1000);

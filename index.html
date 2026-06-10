@@ -270,7 +270,7 @@ const LEVEL_MAPS = [
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
     0,0,1,1,0,0,1,1,0,0,0,0,0,1,1,0,0,1,1,0,0,
-    0,0,1,1,0,0,1,1,0,0,0,0,0,1,1,0,0,1,1,0,0,
+    0,0,1,1,0,0,1,1,0,0,0,1,1,1,1,0,0,1,1,0,0,
     0,0,1,1,0,0,1,1,1,1,1,1,1,1,1,0,0,1,1,0,0,
     0,0,1,1,0,0,1,1,0,5,5,5,0,1,1,0,0,1,1,0,0,
     0,0,0,0,0,0,0,0,0,5,5,5,0,0,0,0,0,0,0,0,0,
@@ -351,13 +351,13 @@ class Tank {
     this.speed = isPlayer ? PLAYER_SPEED : ENEMY_SPEED;
     this.alive = true;
     this.shootCooldown = 0;
-    this.shootDelay = isPlayer ? 15 : 40;
+    this.shootDelay = isPlayer ? 15 : 50 + Math.floor(Math.random() * 30);
     this.bullets = [];
     this.animTimer = 0;
     // 敌人 AI
     this.aiDirTimer = 0;
     this.aiDirDuration = 60;
-    this.aiShootTimer = 0;
+    this.aiShootTimer = 120; // 出生2秒不射击，防止秒杀基地
   }
 
   getRect() {
@@ -430,6 +430,12 @@ class PowerUp {
   }
   getRect() {
     return { left: this.x - 10, top: this.y - 10, right: this.x + 10, bottom: this.y + 10 };
+  }
+
+  collidesWith(otherRect) {
+    const r = this.getRect();
+    return !(r.right <= otherRect.left || r.left >= otherRect.right ||
+             r.bottom <= otherRect.top || r.top >= otherRect.bottom);
   }
 }
 
@@ -1098,8 +1104,13 @@ function showGameOver(won) {
 
 // ---------- 游戏循环 ----------
 function gameLoop() {
-  update();
-  draw();
+  try {
+    update();
+    draw();
+  } catch (err) {
+    console.error('Game loop error:', err);
+    // 不要因为一帧出错就停止整个游戏循环
+  }
   requestAnimationFrame(gameLoop);
 }
 

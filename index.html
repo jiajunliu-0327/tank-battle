@@ -156,6 +156,7 @@
     <div class="stats">
       <div>🏆 <span id="scoreDisplay">0</span></div>
       <div>❤️ <span id="livesDisplay">3</span></div>
+      <div>🏠 <span id="baseDisplay">3</span></div>
       <div>🎯 <span id="waveDisplay">1</span></div>
       <div>💀 <span id="enemyCount">0</span></div>
     </div>
@@ -200,6 +201,7 @@ const scoreDisplay = document.getElementById('scoreDisplay');
 const livesDisplay = document.getElementById('livesDisplay');
 const waveDisplay = document.getElementById('waveDisplay');
 const enemyCountDisplay = document.getElementById('enemyCount');
+const baseDisplay = document.getElementById('baseDisplay');
 const overlay = document.getElementById('overlay');
 const overlayPanel = document.getElementById('overlayPanel');
 
@@ -234,6 +236,7 @@ let gameRunning = false;
 let gamePaused = false;
 let gameOver = false;
 let victoryShown = false;
+let baseHP = 3; // 基地有3格，全部被摧毁才失败
 
 // ---------- 输入处理 ----------
 const keys = {};
@@ -454,6 +457,8 @@ function isSolid(tile) {
   return tile === 1 || tile === 2 || tile === 5;
 }
 
+// type 5=基地（未摧毁，不可通行）, type 6=基地废墟（已被摧毁，可通行）
+
 function getTileRect(col, row) {
   return {
     left: col * TILE_SIZE,
@@ -504,7 +509,12 @@ function spawnEnemies(count) {
     const pt = spawnPoints[i];
     const ex = pt.x * TILE_SIZE + TILE_SIZE / 2;
     const ey = pt.y * TILE_SIZE + TILE_SIZE / 2;
-    enemies.push(new Tank(ex, ey, DIR_DOWN, '#ef4444', false));
+    // 根据出生点位置决定初始方向：中间敌人向两侧移动，避免直射基地
+    let startDir;
+    if (pt.x <= 5) startDir = DIR_RIGHT;
+    else if (pt.x >= 16) startDir = DIR_LEFT;
+    else startDir = i % 2 === 0 ? DIR_LEFT : DIR_RIGHT; // 中间敌人横向移动
+    enemies.push(new Tank(ex, ey, startDir, '#ef4444', false));
   }
 }
 
@@ -523,6 +533,7 @@ function restartGame() {
   gamePaused = false;
   gameOver = false;
   victoryShown = false;
+  baseHP = 3;
   particles = [];
   powerUps = [];
   allBullets = [];
@@ -536,6 +547,7 @@ function restartGame() {
 function nextWave() {
   wave++;
   allBullets = [];
+  baseHP = 3;
   powerUps = [];
   particles = [];
   loadMap(wave - 1);
@@ -548,6 +560,7 @@ function nextWave() {
 function updateUI() {
   scoreDisplay.textContent = score;
   livesDisplay.textContent = player && player.alive ? lives : 0;
+  baseDisplay.textContent = baseHP;
   waveDisplay.textContent = wave;
   enemyCountDisplay.textContent = enemies.filter(e => e.alive).length;
 }
@@ -713,12 +726,18 @@ function update() {
         spawnParticles(col * TILE_SIZE + TILE_SIZE / 2, row * TILE_SIZE + TILE_SIZE / 2, '#94a3b8');
         sfxHit();
       } else if (tile === 5) {
-        // 击中基地！游戏结束
-        setTile(col, row, 0);
-        gameRunning = false;
-        gameOver = true;
-        sfxExplosion();
-        setTimeout(() => showGameOver(false), 500);
+        // 击中基地一格 — 该格变为废墟，仅当3格全毁才失败
+        setTile(col, row, 6); // 6 = 基地废墟
+        baseHP--;
+        spawnParticles(col * TILE_SIZE + TILE_SIZE / 2, row * TILE_SIZE + TILE_SIZE / 2, '#fbbf24');
+        sfxHit();
+        updateUI();
+        if (baseHP <= 0) {
+          gameRunning = false;
+          gameOver = true;
+          sfxExplosion();
+          setTimeout(() => showGameOver(false), 500);
+        }
       }
     }
   }
@@ -927,6 +946,14 @@ function drawTile(col, row, tile) {
       ctx.beginPath();
       ctx.arc(x + TILE_SIZE / 2, y + 5, 4, 0, Math.PI * 2);
       ctx.fill();
+      break;
+    case 6: // 基地废墟
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+      ctx.fillStyle = '#4a4a4a';
+      ctx.fillRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+      ctx.fillStyle = '#333';
+      ctx.fillRect(x + 6, y + 6, TILE_SIZE - 12, TILE_SIZE - 12);
       break;
   }
 }

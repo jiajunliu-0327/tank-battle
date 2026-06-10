@@ -490,10 +490,14 @@ function spawnEnemies(count) {
   const spawnPoints = [
     { x: 1, y: 0 }, { x: 10, y: 0 }, { x: 19, y: 0 },
   ];
+  const usedSpawn = {}; // 追踪每个出生点的使用次数，避免重叠
   for (let i = 0; i < count && i < 6; i++) {
     const pt = spawnPoints[i % spawnPoints.length];
-    const ex = pt.x * TILE_SIZE + HALF_TANK;
-    const ey = pt.y * TILE_SIZE + HALF_TANK;
+    const key = `${pt.x},${pt.y}`;
+    const offset = (usedSpawn[key] || 0) * TILE_SIZE; // 同一出生点的后续敌人错开
+    usedSpawn[key] = (usedSpawn[key] || 0) + 1;
+    const ex = pt.x * TILE_SIZE + HALF_TANK + offset;
+    const ey = pt.y * TILE_SIZE + HALF_TANK + offset;
     enemies.push(new Tank(ex, ey, DIR_DOWN, '#ef4444', false));
   }
 }
@@ -565,7 +569,11 @@ function checkCollision(tank, dx, dy) {
   for (const other of allTanks) {
     if (!other || !other.alive) continue;
     if (other === tank) continue;
-    if (tank.collidesWith(other.getRect())) return true;
+    const otherRect = other.getRect();
+    if (!(testRect.right <= otherRect.left || testRect.left >= otherRect.right ||
+          testRect.bottom <= otherRect.top || testRect.top >= otherRect.bottom)) {
+      return true;
+    }
   }
 
   return false;

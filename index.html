@@ -457,7 +457,7 @@ function getTileRect(col, row) {
   };
 }
 
-function collidesWithMap(rect) {
+function collidesWithMap(rect, ignoreTiles) {
   const leftCol = Math.floor(rect.left / TILE_SIZE);
   const rightCol = Math.floor((rect.right - 0.01) / TILE_SIZE);
   const topRow = Math.floor(rect.top / TILE_SIZE);
@@ -467,6 +467,8 @@ function collidesWithMap(rect) {
     for (let col = leftCol; col <= rightCol; col++) {
       const tile = getTile(col, row);
       if (isSolid(tile)) {
+        // 如果坦克当前已经压在这个格子上，允许它移走（逃脱路径）
+        if (ignoreTiles && ignoreTiles.has(col + ',' + row)) continue;
         return { col, row, tile };
       }
     }
@@ -487,17 +489,15 @@ function spawnPlayer() {
 
 function spawnEnemies(count) {
   enemies = [];
+  // 6个独立出生点，每个敌人独享一个，绝不重叠
   const spawnPoints = [
-    { x: 1, y: 0 }, { x: 10, y: 0 }, { x: 19, y: 0 },
+    { x: 1, y: 0 }, { x: 5, y: 0 }, { x: 9, y: 0 },
+    { x: 13, y: 0 }, { x: 16, y: 0 }, { x: 19, y: 0 },
   ];
-  const usedSpawn = {}; // 追踪每个出生点的使用次数，避免重叠
-  for (let i = 0; i < count && i < 6; i++) {
-    const pt = spawnPoints[i % spawnPoints.length];
-    const key = `${pt.x},${pt.y}`;
-    const offset = (usedSpawn[key] || 0) * TILE_SIZE; // 同一出生点的后续敌人错开
-    usedSpawn[key] = (usedSpawn[key] || 0) + 1;
-    const ex = pt.x * TILE_SIZE + HALF_TANK + offset;
-    const ey = pt.y * TILE_SIZE + HALF_TANK + offset;
+  for (let i = 0; i < count && i < spawnPoints.length; i++) {
+    const pt = spawnPoints[i];
+    const ex = pt.x * TILE_SIZE + TILE_SIZE / 2;
+    const ey = pt.y * TILE_SIZE + TILE_SIZE / 2;
     enemies.push(new Tank(ex, ey, DIR_DOWN, '#ef4444', false));
   }
 }
@@ -561,8 +561,20 @@ function checkCollision(tank, dx, dy) {
     return true;
   }
 
-  // 地图碰撞
-  if (collidesWithMap(testRect)) return true;
+  // 地图碰撞（跳过坦克当前压住的格子，防止卡死在墙内）
+  const curRect = tank.getRect();
+  const ignoreTiles = new Set();
+  const clc = Math.floor(curRect.left / TILE_SIZE);
+  const crc = Math.floor((curRect.right - 0.01) / TILE_SIZE);
+  const ctr = Math.floor(curRect.top / TILE_SIZE);
+  const cbr = Math.floor((curRect.bottom - 0.01) / TILE_SIZE);
+  for (let r = ctr; r <= cbr; r++) {
+    for (let c = clc; c <= crc; c++) {
+      const ct = getTile(c, r);
+      if (isSolid(ct)) ignoreTiles.add(c + ',' + r);
+    }
+  }
+  if (collidesWithMap(testRect, ignoreTiles)) return true;
 
   // 坦克碰撞
   const allTanks = tank.isPlayer ? enemies : [player, ...enemies.filter(e => e !== tank && e.alive)];
@@ -919,7 +931,7 @@ function drawTank(tank) {
   ctx.translate(tank.x, tank.y);
 
   // 旋转方向
-  const angles = [-Math.PI / 2, 0, Math.PI / 2, Math.PI];
+  const angles = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
   ctx.rotate(angles[tank.dir]);
 
   // 履带动画偏移
